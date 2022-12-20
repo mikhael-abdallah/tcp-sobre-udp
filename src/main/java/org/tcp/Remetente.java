@@ -19,6 +19,8 @@ do remetente pode ser aumentada em relação ao modo de operação pare e espere
 
 import java.io.IOException;
 import java.net.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -115,6 +117,20 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
 
     public static void main(String[] args) throws IOException {
         Remetente remetente = new Remetente();
+
+        byte[] bytes = Files.readAllBytes(Paths.get("file.txt")); // 588kB para serem enviados
+
+        /*
+        TODO:
+            Criar uma thread para o remetente já ir adicionando a mensagem que será enviada no buffer. Implementar limitações
+            para não ultrapassar o tamanho máximo do buffer do remetente
+         */
+
+        /*
+        TODO:
+            Criar uma thread para o remetente ficar escutando os acks e armazenar os acks recebidos.
+         */
+
         remetente.estabeleceConexao();
     }
 
