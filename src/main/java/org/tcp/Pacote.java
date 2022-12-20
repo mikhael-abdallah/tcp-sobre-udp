@@ -1,12 +1,15 @@
 package org.tcp;
 
+import java.lang.reflect.Array;
+import java.util.Arrays;
+
 /*
 TODO: Para ficar mais legível é possível referenciar separadamente cada pedaço de bytes como uma variável ao invés de usar
 direto o array de 20 bytes, mas só pensei nisso depois. Por enquanto dá pra ir usando os métodos.
  */
 public class Pacote {
     byte[] cabecalho = new byte[20];
-    byte[] dados = new byte[1024];
+    byte[] dados = new byte[0];
 
     private final int ACK_POSITION = 0;
     private final int RST_POSITION = 1;
@@ -16,8 +19,8 @@ public class Pacote {
     private final int URG_POSITION = 5;
 
 
-    Pacote(int portaOrigem, int portaDestino, int numeroSequencia, int numeroReconhecimento,boolean ack, boolean rst, boolean  syn,
-           boolean fin, boolean psh, boolean urg, int janelaRecepcao) {
+    public Pacote(int portaOrigem, int portaDestino, int numeroSequencia, int numeroReconhecimento, boolean ack, boolean rst, boolean syn,
+                  boolean fin, boolean psh, boolean urg, int janelaRecepcao) {
         this.setPortaOrigem(portaOrigem);
         this.setPortaDestino(portaDestino);
         this.setNumeroSequencia(numeroSequencia);
@@ -30,6 +33,11 @@ public class Pacote {
         this.setPsh(psh);
         this.setUrg(urg);
         this.setJanelaRecepcao(janelaRecepcao);
+    }
+
+    public Pacote(byte[] cabecalho, byte[] dados) {
+        this.cabecalho = cabecalho;
+        this.dados = dados;
     }
 
     //métodos de get
@@ -161,5 +169,37 @@ public class Pacote {
     public Boolean getFlagBit(byte _byte, int bitPosition)
     {
         return (_byte & (1 << bitPosition)) != 0;
+    }
+
+    public byte[] criaSegmentoDeBytes() {
+        Class<?> compType1 = this.cabecalho.getClass().getComponentType();
+
+        int len1 = Array.getLength(this.cabecalho);
+        int len2 = Array.getLength(this.dados);
+
+        byte[] result = (byte[]) Array.newInstance(compType1, len1 + len2);
+
+        System.arraycopy(this.cabecalho, 0, result, 0, len1);
+        System.arraycopy(this.dados, 0, result, len1, len2);
+
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "Pacote{" +
+                "cabecalho={" +
+                "portaOrigem=" + this.getPortaOrigem() +
+                ", portaDestino=" + this.getPortaDestino() +
+                ", numeroSequencia="+ this.getNumeroSequencia() +
+                ", numeroReconhecimento="+ this.getNumeroReconhecimento() +
+                ", comprimentoCabecalho=" + this.getTamanhoCabecalho() +
+                ", URG=" + this.getUrg() +
+                ", ACK=" + this.getAck() +
+                ", PSH=" + this.getPsh() +
+                ", RST=" + this.getRst() +
+                ", SYN=" + this.getSyn() +
+                ", FIN=" + this.getFin() +
+                '}';
     }
 }

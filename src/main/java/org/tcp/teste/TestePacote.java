@@ -1,4 +1,6 @@
-package org.tcp;
+package org.tcp.teste;
+
+import org.tcp.Pacote;
 
 public class TestePacote {
     public static  void main(String[] args) {
