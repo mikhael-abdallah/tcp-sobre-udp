@@ -1,13 +1,15 @@
-package org.tcp;
+package org.tcp.remetente;
+
+import org.tcp.Pacote;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
 
 public class ThreadEnviaPacote extends Thread {
 
-    private Pacote pacote;
+    public Pacote pacote;
 
-    private Remetente remetente;
+    public Remetente remetente;
 
     public ThreadEnviaPacote(Remetente remetente, Pacote pacote) throws UnknownHostException {
         this.remetente = remetente;
@@ -17,12 +19,13 @@ public class ThreadEnviaPacote extends Thread {
     @Override
     public void run() {
         try {
+            remetente.numSequencia += this.pacote.dados.length;
             Integer reconhecimentoEsperado = this.pacote.getNumeroSequencia() + this.pacote.dados.length + 1;
             boolean confirmado = false;
             while(!confirmado) {
                 remetente.enviaPacote(this.pacote);
                 confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
-                Thread.sleep(1000); // Aguarda 1 segundo antes de reenviar o pacote.
+                Thread.sleep(5000); // Aguarda 5 segundos antes de reenviar o pacote.
             }
 
         } catch (IOException | InterruptedException e) {

@@ -1,4 +1,4 @@
-package org.tcp;
+package org.tcp.remetente;
 
 /*
 Mecanismos de transferência confiável de dados e sua utilização:
@@ -17,14 +17,18 @@ determinada faixa. Permitindo que vários pacotes sejam transmitidos, ainda que 
 do remetente pode ser aumentada em relação ao modo de operação pare e espere.
  */
 
+import org.tcp.Destinatario;
+import org.tcp.Pacote;
+
 import java.io.IOException;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.Semaphore;
 
 public  class Remetente {
 
@@ -38,6 +42,10 @@ public  class Remetente {
     // Atributo usado dar ao remetente o espaço de buffer livre disponível no destinatário
     Integer janelaRecepcao = 0;
     Integer reconhecimentoAtual = 0;
+
+    Integer numSequencia = 0;
+
+    Integer janelaEnvio = 1;
 
 
     Remetente() throws SocketException, UnknownHostException {
@@ -56,18 +64,10 @@ responde novamente com um terceiro segmento especial.
 segmento não contém nenhum dado de camada de aplicação, mas um dos bits de flag no seu cabeçalho, o bit SYN, é ajustado para 1.
          */
         this.enviaSegmentoSYN();
-
-        /*
-         Etapa 2 e 3 da conexão: Receber segmento SYNACK
-         */
-        this.recebeSegmentoSYNACK();
     }
 
-    private void recebeSegmentoSYNACK() throws IOException {
-        Pacote synack = this.recebePacote();
-    }
 
-    private Pacote recebePacote() throws IOException {
+    public void recebePacote() throws IOException {
         byte[ ] dadosRecebidos = new byte[this.MSS + this.TAM_CABECALHO];
         DatagramPacket pacoteRecebido =
                 new DatagramPacket(dadosRecebidos, dadosRecebidos.length);
@@ -82,11 +82,15 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
 
         Pacote pacoteTCPRecebido = new Pacote(cabecalhoTCP, dados);
 
+        Integer reconhecimentoRecebido = pacoteTCPRecebido.getNumeroReconhecimento();
+        if(reconhecimentoRecebido > this.reconhecimentoAtual) {
+            this.janelaEnvio += (reconhecimentoRecebido - this.reconhecimentoAtual) / this.MSS;
+            this.janelaEnvio = Math.max(this.janelaEnvio, 50);
+        }
+
         this.reconhecimentoAtual = Math.max(this.reconhecimentoAtual, pacoteTCPRecebido.getNumeroReconhecimento());
 
         this.janelaRecepcao = pacoteTCPRecebido.getJanelaRecepcao();
-
-        return pacoteTCPRecebido;
     }
 
     private void enviaSegmentoSYN() throws IOException {
@@ -107,6 +111,62 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
         System.out.println("enviado");
     }
 
+    public void enviaMensagem(byte[] mensagem) throws UnknownHostException {
+        /*
+        TODO:
+            Criar uma thread para o remetente já ir adicionando a mensagem que será enviada no buffer. Implementar limitações
+            para não ultrapassar o tamanho máximo do buffer do remetente
+         */
+
+        byte[][] segmentos = this.separaSegmentos(mensagem);
+
+        Integer numSequencia = 1;
+
+        // Prepara as threads que serão disparadas para o envio.
+        Queue<ThreadEnviaPacote> threadEnviaPacotes = new LinkedList<>();
+        for(byte[] segmento: segmentos) {
+            Pacote pacote = new Pacote(this.portaOrigem, this.portaDestino, numSequencia, 0, false, false, false, false, false, false, 0);
+            pacote.dados = segmento;
+            numSequencia += segmento.length;
+            threadEnviaPacotes.add(new ThreadEnviaPacote(this, pacote));
+        }
+
+        while (threadEnviaPacotes.size() != 0) {
+            int janelaAtual = this.janelaEnvio;
+            int reconhecimentoAtual = this.reconhecimentoAtual;
+            int maxNumSequencia = reconhecimentoAtual + janelaAtual * this.MSS;
+
+            Pacote pacote = threadEnviaPacotes.element().pacote;
+            int numSequenciaEnv = pacote.getNumeroSequencia();
+            if(numSequenciaEnv < maxNumSequencia) {
+                ThreadEnviaPacote thread = threadEnviaPacotes.poll();
+                thread.start();
+            }
+
+        }
+
+
+    }
+
+    private byte[][] separaSegmentos(byte[] mensagem) {
+        int totalBytes = mensagem.length;
+        Integer totalDeSegmentos = (totalBytes + this.MSS - 1) / this.MSS;
+
+        byte[][] segmentos = new byte[totalDeSegmentos][this.MSS];
+
+        int segmento = 0;
+        int i = 0;
+        while (i < totalBytes) {
+            int index = i % this.MSS;
+            segmentos[segmento][i % this.MSS] = mensagem[i];
+            i++;
+            if(index == this.MSS -1)
+                segmento++;
+        }
+
+        return segmentos;
+    }
+
 
     public boolean reconhecimentoFoiRecebido(Integer numReconhecimento) {
         return this.reconhecimentoAtual >= numReconhecimento;
@@ -120,18 +180,13 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
 
         byte[] bytes = Files.readAllBytes(Paths.get("file.txt")); // 588kB para serem enviados
 
-        /*
-        TODO:
-            Criar uma thread para o remetente já ir adicionando a mensagem que será enviada no buffer. Implementar limitações
-            para não ultrapassar o tamanho máximo do buffer do remetente
-         */
 
-        /*
-        TODO:
-            Criar uma thread para o remetente ficar escutando os acks e armazenar os acks recebidos.
-         */
 
+        ThreadRecebePacotes threadRecebePacotes = new ThreadRecebePacotes(remetente);
+        threadRecebePacotes.start();
         remetente.estabeleceConexao();
+
+        remetente.enviaMensagem(bytes);
     }
 
 }
