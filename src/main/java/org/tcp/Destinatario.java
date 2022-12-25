@@ -68,7 +68,7 @@ public class Destinatario {
         System.out.println("recebeu pacote");
         System.out.println(pacote);
 
-        Integer reconhecimentoAEnviar = numSequencia + tamanho;
+        Integer reconhecimentoAEnviar = this.numSequenciaEsperado + tamanho;
         if(!numSequencia.equals(this.numSequenciaEsperado)) {
             reconhecimentoAEnviar = this.numSequenciaEsperado;
             pacotesRecebidos.put(numSequencia, pacote.dados);
@@ -88,13 +88,15 @@ public class Destinatario {
     }
 
     /*
-    Verifica flag SYN, ela indica uma nova coneção.
+    Verifica flag SYN, ela indica uma nova conexão.
      */
     public void verificaSeEhNovaConexao(Pacote pacote) throws IOException {
         int portaRemetente = pacote.getPortaOrigem();
         int numSequencia = this.destinatarioSeqNum;
-        int numReconhecimento = numSequencia + 1 + pacote.dados.length;
-        this.numSequenciaEsperado = numReconhecimento;
+        int numReconhecimento = numSequencia + pacote.dados.length + 1;
+        this.numSequenciaEsperado += numReconhecimento;
+        System.out.println("num esperado");
+        System.out.println(this.numSequenciaEsperado);
         Pacote confirmacaoSyn = new Pacote(Destinatario.porta, portaRemetente, this.destinatarioSeqNum, numReconhecimento, false, true, true, false, false, false, this.janelaRecepcaoDisponivel );
         this.enviaPacote(confirmacaoSyn);
     }

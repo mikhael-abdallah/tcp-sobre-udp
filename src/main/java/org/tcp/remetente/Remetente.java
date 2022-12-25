@@ -144,24 +144,28 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
             }
 
         }
-
-
     }
 
     private byte[][] separaSegmentos(byte[] mensagem) {
-        int totalBytes = mensagem.length;
-        Integer totalDeSegmentos = (totalBytes + this.MSS - 1) / this.MSS;
+        int numSegmentos = (int) Math.ceil((double)mensagem.length / this.MSS);
+        int restoBytes = mensagem.length % this.MSS;
+        boolean ultimaLinhaIncompleta = (restoBytes > 0);
+        int count = 0;
 
-        byte[][] segmentos = new byte[totalDeSegmentos][this.MSS];
+        byte[][] segmentos = new byte[numSegmentos][];
 
-        int segmento = 0;
-        int i = 0;
-        while (i < totalBytes) {
-            int index = i % this.MSS;
-            segmentos[segmento][i % this.MSS] = mensagem[i];
-            i++;
-            if(index == this.MSS -1)
-                segmento++;
+        for(int segmento = 0; segmento < numSegmentos; segmento++) {
+            int bytesNaLinha;
+            if(ultimaLinhaIncompleta && segmento == numSegmentos - 1) {
+                bytesNaLinha = restoBytes;
+            } else {
+                bytesNaLinha = this.MSS;
+            }
+            segmentos[segmento] = new byte[bytesNaLinha];
+            for(int col = 0; col < bytesNaLinha; col++) {
+                segmentos[segmento][col] = mensagem[count];
+                count++;
+            }
         }
 
         return segmentos;
@@ -169,6 +173,8 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
 
 
     public boolean reconhecimentoFoiRecebido(Integer numReconhecimento) {
+        System.out.println(this.reconhecimentoAtual);
+        System.out.println(numReconhecimento);
         return this.reconhecimentoAtual >= numReconhecimento;
     }
     /*

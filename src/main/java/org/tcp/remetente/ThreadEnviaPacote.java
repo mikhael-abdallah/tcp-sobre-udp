@@ -20,12 +20,15 @@ public class ThreadEnviaPacote extends Thread {
     public void run() {
         try {
             remetente.numSequencia += this.pacote.dados.length;
-            Integer reconhecimentoEsperado = this.pacote.getNumeroSequencia() + this.pacote.dados.length + 1;
-            boolean confirmado = false;
+            Integer reconhecimentoEsperado = this.pacote.getNumeroSequencia() + this.pacote.dados.length;
+            if(pacote.getSyn()) {
+                reconhecimentoEsperado++;
+            }
+            boolean confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
             while(!confirmado) {
                 remetente.enviaPacote(this.pacote);
                 confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
-                Thread.sleep(5000); // Aguarda 5 segundos antes de reenviar o pacote.
+                Thread.sleep(1000); // Aguarda 5 segundos antes de reenviar o pacote.
             }
 
         } catch (IOException | InterruptedException e) {
