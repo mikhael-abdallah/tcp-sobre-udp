@@ -27,8 +27,8 @@ public class ThreadEnviaPacote extends Thread {
             boolean confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
             while(!confirmado) {
                 remetente.enviaPacote(this.pacote);
-                confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
                 Thread.sleep(1000); // Aguarda 5 segundos antes de reenviar o pacote.
+                confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
             }
 
         } catch (IOException | InterruptedException e) {
