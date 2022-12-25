@@ -17,6 +17,13 @@ determinada faixa. Permitindo que vários pacotes sejam transmitidos, ainda que 
 do remetente pode ser aumentada em relação ao modo de operação pare e espere.
  */
 
+/*
+TODO: Implementar mudança no tamanho da janela de envio conforme os pacotes são perdidos.
+Caso Timeout: Reduz da janela pra 1
+Quando recebe 3 acks iguais seguidos: Reduz o tamanho pra metade
+Quando ultrapassar a parte de partida lenta, aumentar o tamanho lentamente. (+1 pra cada janela enviada).
+ */
+
 import org.tcp.Destinatario;
 import org.tcp.Pacote;
 
@@ -112,11 +119,6 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
     }
 
     public void enviaMensagem(byte[] mensagem) throws UnknownHostException {
-        /*
-        TODO:
-            Criar uma thread para o remetente já ir adicionando a mensagem que será enviada no buffer. Implementar limitações
-            para não ultrapassar o tamanho máximo do buffer do remetente
-         */
 
         byte[][] segmentos = this.separaSegmentos(mensagem);
 
@@ -173,8 +175,6 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
 
 
     public boolean reconhecimentoFoiRecebido(Integer numReconhecimento) {
-        System.out.println(this.reconhecimentoAtual);
-        System.out.println(numReconhecimento);
         return this.reconhecimentoAtual >= numReconhecimento;
     }
     /*

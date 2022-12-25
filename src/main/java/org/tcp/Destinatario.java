@@ -57,8 +57,6 @@ public class Destinatario {
             else
                 recebePacote(pacoteTCPRecebido);
 
-
-            System.out.println(pacoteTCPRecebido);
         }
     }
 
@@ -71,7 +69,7 @@ public class Destinatario {
         Integer reconhecimentoAEnviar = this.numSequenciaEsperado + tamanho;
         if(!numSequencia.equals(this.numSequenciaEsperado)) {
             reconhecimentoAEnviar = this.numSequenciaEsperado;
-            pacotesRecebidos.put(numSequencia, pacote.dados);
+            pacotesRecebidos.put(numSequencia, pacote.dados); //TODO: Colocar limite de buffer de recepção.
         } else {
             this.numSequenciaEsperado = reconhecimentoAEnviar;
             this.fileOutputStream.write(pacote.dados);
