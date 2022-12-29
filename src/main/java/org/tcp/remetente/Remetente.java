@@ -27,6 +27,7 @@ Quando ultrapassar a parte de partida lenta, aumentar o tamanho lentamente. (+1 
 import org.tcp.Destinatario;
 import org.tcp.Pacote;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.nio.file.Files;
@@ -54,10 +55,16 @@ public  class Remetente {
 
     Integer janelaEnvio = 1;
 
+    public long startTime;
 
-    Remetente() throws SocketException, UnknownHostException {
+    private int probabilidadePerda;
+
+    private long tamArquivo = new File("file.txt").length();
+
+    Remetente(int probabilidadePerda) throws SocketException, UnknownHostException {
         this.socket= new DatagramSocket();
         this.portaOrigem = this.socket.getLocalPort();
+        this.probabilidadePerda = probabilidadePerda;
     }
 
     /*
@@ -97,6 +104,11 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
 
         this.reconhecimentoAtual = Math.max(this.reconhecimentoAtual, pacoteTCPRecebido.getNumeroReconhecimento());
 
+        if(this.reconhecimentoAtual == this.tamArquivo + 1) {
+            long time = System.currentTimeMillis() - this.startTime;
+            System.out.printf("Levou %d milissegundos para terminar o envio", time);
+        }
+
         this.janelaRecepcao = pacoteTCPRecebido.getJanelaRecepcao();
     }
 
@@ -112,10 +124,14 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
     }
 
     public void enviaPacote(Pacote pacote) throws IOException {
-        byte[] segmento = pacote.criaSegmentoDeBytes();
-        DatagramPacket pacoteEnviado = new DatagramPacket(segmento, segmento.length, enderecoIP, pacote.getPortaDestino());
-        socket.send(pacoteEnviado);
-        System.out.println("enviado");
+        boolean perdeuPacote = Math.random()*100 <= this.probabilidadePerda;
+        if(!perdeuPacote) {
+            byte[] segmento = pacote.criaSegmentoDeBytes();
+            DatagramPacket pacoteEnviado = new DatagramPacket(segmento, segmento.length, enderecoIP, pacote.getPortaDestino());
+            socket.send(pacoteEnviado);
+            System.out.println("enviado");
+        }
+
     }
 
     public void enviaMensagem(byte[] mensagem) throws UnknownHostException {
@@ -182,14 +198,15 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
      */
 
     public static void main(String[] args) throws IOException {
-        Remetente remetente = new Remetente();
+        Remetente remetente = new Remetente(5);
 
         byte[] bytes = Files.readAllBytes(Paths.get("file.txt")); // 588kB para serem enviados
 
-
-
         ThreadRecebePacotes threadRecebePacotes = new ThreadRecebePacotes(remetente);
         threadRecebePacotes.start();
+
+        remetente.startTime = System.currentTimeMillis();
+
         remetente.estabeleceConexao();
 
         remetente.enviaMensagem(bytes);
