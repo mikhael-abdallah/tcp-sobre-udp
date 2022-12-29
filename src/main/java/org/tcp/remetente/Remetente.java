@@ -60,11 +60,13 @@ public  class Remetente {
     private int probabilidadePerda;
 
     private long tamArquivo = new File("file.txt").length();
+    private int maxTamJanela;
 
-    Remetente(int probabilidadePerda) throws SocketException, UnknownHostException {
+    Remetente(int probabilidadePerda, int maxTamJanela) throws SocketException, UnknownHostException {
         this.socket= new DatagramSocket();
         this.portaOrigem = this.socket.getLocalPort();
         this.probabilidadePerda = probabilidadePerda;
+        this.maxTamJanela = maxTamJanela;
     }
 
     /*
@@ -99,7 +101,7 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
         Integer reconhecimentoRecebido = pacoteTCPRecebido.getNumeroReconhecimento();
         if(reconhecimentoRecebido > this.reconhecimentoAtual) {
             this.janelaEnvio += (reconhecimentoRecebido - this.reconhecimentoAtual) / this.MSS;
-            this.janelaEnvio = Math.max(this.janelaEnvio, 50);
+            this.janelaEnvio = Math.max(this.janelaEnvio, this.maxTamJanela);
         }
 
         this.reconhecimentoAtual = Math.max(this.reconhecimentoAtual, pacoteTCPRecebido.getNumeroReconhecimento());
@@ -198,7 +200,7 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
      */
 
     public static void main(String[] args) throws IOException {
-        Remetente remetente = new Remetente(5);
+        Remetente remetente = new Remetente(10, 1000);
 
         byte[] bytes = Files.readAllBytes(Paths.get("file.txt")); // 588kB para serem enviados
 
