@@ -10,21 +10,12 @@ Número de sequência: Usado para numeração sequencial de pacotes de dados que
 Reconhecimento: Usado pelo destinatário para avisar o remetente que um pacote ou conjunto de pacotes foi recebido
 corretamente.
 
-Reconhecimento negativo: Usado pelo destinatário para avisar o remetente que um pacote não foi recebido corretamente.
-
 Janela, paralelismo: O remetente pode ficar restrito a enviar somente pacotes com números de sequência que caiam dentro de uma
 determinada faixa. Permitindo que vários pacotes sejam transmitidos, ainda que não reconhecidos, a utilização
 do remetente pode ser aumentada em relação ao modo de operação pare e espere.
  */
 
-/*
-TODO: Implementar mudança no tamanho da janela de envio conforme os pacotes são perdidos.
-Caso Timeout: Reduz da janela pra 1
-Quando recebe 3 acks iguais seguidos: Reduz o tamanho pra metade
-Quando ultrapassar a parte de partida lenta, aumentar o tamanho lentamente. (+1 pra cada janela enviada).
- */
-
-import org.tcp.Destinatario;
+import org.tcp.Destinatario.Destinatario;
 import org.tcp.Pacote;
 
 import java.io.File;
@@ -32,11 +23,7 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.concurrent.Semaphore;
+import java.util.*;
 
 public  class Remetente {
 
@@ -44,13 +31,15 @@ public  class Remetente {
     private final int TAM_CABECALHO = 20;
     private int portaDestino = Destinatario.porta;
     private int portaOrigem;
-     final InetAddress enderecoIP = InetAddress.getByName("127.0.0.1");
+    final InetAddress enderecoIP = InetAddress.getByName("127.0.0.1");
     private DatagramSocket socket;
+
+    private int numAcksNaJanela = 0;
+    private int acksIguais = 0;
 
     // Atributo usado dar ao remetente o espaço de buffer livre disponível no destinatário
     Integer janelaRecepcao = 0;
     Integer reconhecimentoAtual = 0;
-
     Integer numSequencia = 0;
 
     Integer janelaEnvio = 1;
@@ -62,11 +51,18 @@ public  class Remetente {
     private long tamArquivo = new File("file.txt").length();
     private int maxTamJanela;
 
-    Remetente(int probabilidadePerda, int maxTamJanela) throws SocketException, UnknownHostException {
+    private HashMap<Integer, Pacote> pacotesAEnviar = new HashMap<>(); // reconhecimento esperado -> pacote
+
+    public int delayPropagacao;
+
+    public static int velocidadeTransmissaoKBPorS;
+
+    public Remetente(int probabilidadePerda, int maxTamJanela, int delayPropagacao) throws SocketException, UnknownHostException {
         this.socket= new DatagramSocket();
         this.portaOrigem = this.socket.getLocalPort();
         this.probabilidadePerda = probabilidadePerda;
         this.maxTamJanela = maxTamJanela;
+        this.delayPropagacao = delayPropagacao;
     }
 
     /*
@@ -97,18 +93,46 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
         byte[] dados = Arrays.copyOfRange(dadosRecebidos, this.TAM_CABECALHO, this.MSS + this.TAM_CABECALHO);
 
         Pacote pacoteTCPRecebido = new Pacote(cabecalhoTCP, dados);
+        System.out.printf("Pacote TCP recebido:%n %s%n", pacoteTCPRecebido);
 
         Integer reconhecimentoRecebido = pacoteTCPRecebido.getNumeroReconhecimento();
         if(reconhecimentoRecebido > this.reconhecimentoAtual) {
-            this.janelaEnvio += (reconhecimentoRecebido - this.reconhecimentoAtual) / this.MSS;
-            this.janelaEnvio = Math.max(this.janelaEnvio, this.maxTamJanela);
+            if(this.janelaEnvio >= maxTamJanela){
+
+                if(this.numAcksNaJanela >= this.janelaEnvio){
+                    this.janelaEnvio += 1;
+                    this.numAcksNaJanela = 0;
+                }
+
+                this.numAcksNaJanela +=1;
+
+            }
+            else{
+                this.janelaEnvio += (reconhecimentoRecebido - this.reconhecimentoAtual) / this.MSS;
+                this.janelaEnvio = Math.max(this.janelaEnvio, this.maxTamJanela);
+            }
+            this.acksIguais=1;
+        } else if(reconhecimentoRecebido.equals(this.reconhecimentoAtual)) {
+            this.acksIguais ++;
+            if(this.acksIguais % 3 == 0){
+                this.criaThreadEnviaPacote(this.pacotesAEnviar.get(reconhecimentoRecebido)); // reenvia pacote préviamente
+                this.janelaEnvio /= 2;
+            }
         }
 
         this.reconhecimentoAtual = Math.max(this.reconhecimentoAtual, pacoteTCPRecebido.getNumeroReconhecimento());
 
+        System.out.printf("rec Atual = %d, tam = %d%n", this.reconhecimentoAtual, this.tamArquivo + 1);
         if(this.reconhecimentoAtual == this.tamArquivo + 1) {
             long time = System.currentTimeMillis() - this.startTime;
-            System.out.printf("Levou %d milissegundos para terminar o envio", time);
+            System.out.printf("Levou %d milissegundos para terminar o envio%n", time);
+            int velTransmissao = Remetente.velocidadeTransmissaoKBPorS;
+            System.out.println(velTransmissao);
+            double tempoOtimo = this.tamArquivo / velTransmissao;
+            System.out.printf("Em um cenário ótimo, deveria demorar %f%n", tempoOtimo);
+            double taxaUtil = tempoOtimo / time;
+            double percent = (double) (100 * taxaUtil);
+            System.out.printf("Taxa util: %.2f%% %n", percent);
         }
 
         this.janelaRecepcao = pacoteTCPRecebido.getJanelaRecepcao();
@@ -120,6 +144,9 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
         this.criaThreadEnviaPacote(pacoteSYN);
     }
 
+    public void setJanelaEnvio(int i){
+        this.janelaEnvio = i;
+    }
     public void criaThreadEnviaPacote(Pacote pacote) throws UnknownHostException {
         ThreadEnviaPacote thread = new ThreadEnviaPacote(this, pacote);
         thread.start();
@@ -148,6 +175,7 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
             Pacote pacote = new Pacote(this.portaOrigem, this.portaDestino, numSequencia, 0, false, false, false, false, false, false, 0);
             pacote.dados = segmento;
             numSequencia += segmento.length;
+            this.pacotesAEnviar.put(numSequencia, pacote);
             threadEnviaPacotes.add(new ThreadEnviaPacote(this, pacote));
         }
 
@@ -200,7 +228,8 @@ segmento não contém nenhum dado de camada de aplicação, mas um dos bits de f
      */
 
     public static void main(String[] args) throws IOException {
-        Remetente remetente = new Remetente(10, 1000);
+        Remetente remetente = new Remetente(0, 50, 100);
+        Remetente.velocidadeTransmissaoKBPorS = 250;
 
         byte[] bytes = Files.readAllBytes(Paths.get("file.txt")); // 588kB para serem enviados
 

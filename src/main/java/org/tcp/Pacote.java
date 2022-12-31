@@ -3,10 +3,7 @@ package org.tcp;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 
-/*
-TODO: Para ficar mais legível é possível referenciar separadamente cada pedaço de bytes como uma variável ao invés de usar
-direto o array de 20 bytes, mas só pensei nisso depois. Por enquanto dá pra ir usando os métodos.
- */
+
 public class Pacote {
     byte[] cabecalho = new byte[20];
     public byte[] dados = new byte[0];

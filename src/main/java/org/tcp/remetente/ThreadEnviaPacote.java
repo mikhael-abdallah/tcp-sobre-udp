@@ -19,6 +19,7 @@ public class ThreadEnviaPacote extends Thread {
     @Override
     public void run() {
         try {
+            int delayPropagacao = remetente.delayPropagacao;
             remetente.numSequencia += this.pacote.dados.length;
             Integer reconhecimentoEsperado = this.pacote.getNumeroSequencia() + this.pacote.dados.length;
             if(pacote.getSyn()) {
@@ -26,9 +27,11 @@ public class ThreadEnviaPacote extends Thread {
             }
             boolean confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
             while(!confirmado) {
+                Thread.sleep(delayPropagacao); // Delay propagação
                 remetente.enviaPacote(this.pacote);
-                Thread.sleep(1000); // Aguarda 5 segundos antes de reenviar o pacote.
+                Thread.sleep(1000); // Aguarda 1 segundo antes de reenviar o pacote.
                 confirmado = this.remetente.reconhecimentoFoiRecebido(reconhecimentoEsperado);
+                if(!confirmado) remetente.setJanelaEnvio(1);
             }
 
         } catch (IOException | InterruptedException e) {
